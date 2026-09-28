@@ -1,0 +1,35 @@
+Cardio_AI_FireBoltt/
+├── README.md
+├── docs/
+│   ├── PROJECT_PLAN.md
+│   ├── FIREBOLTT_INTEGRATION.md
+│   ├── DATA_FORMAT.md
+│   └── TREE.txt
+├── android/
+│   ├── README.md
+│   ├── settings.gradle.kts
+│   ├── build.gradle.kts
+│   ├── app/build.gradle.kts
+│   └── app/src/main/
+│       ├── AndroidManifest.xml
+│       ├── java/com/example/cardioai/
+│       │   ├── MainActivity.kt
+│       │   ├── HealthReading.kt
+│       │   ├── FireBolttAdapter.kt
+│       │   └── FireBolttBleAdapter.kt
+│       └── res/values/styles.xml
+├── backend/
+│   ├── requirements.txt
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── db.py
+│       ├── models.py
+│       ├── anomaly.py
+│       └── main.py
+├── dashboard/
+│   ├── requirements.txt
+│   └── app.py
+└── simulator/
+    ├── requirements.txt
+    └── simulate.py
