@@ -2,50 +2,61 @@ import requests
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Cardio AI - Fire-Boltt", layout="wide")
-st.title("⌚ Cardio AI — Fire-Boltt Dashboard")
-st.caption("Academic anomaly-detection prototype; not a medical diagnostic system.")
-
-API = st.sidebar.text_input(
-    "Backend URL",
-    "http://127.0.0.1:8000"
-)
+st.set_page_config(page_title="Cardio AI Dashboard", page_icon="💓", layout="wide")
+st.title("💓 Cardio AI — Wellness Pattern Dashboard")
+st.caption("Academic prototype. Synthetic simulator data is labeled; this is not a medical diagnostic system.")
+api = st.sidebar.text_input("Backend URL", "http://127.0.0.1:8000").rstrip("/")
+refresh = st.sidebar.button("Refresh data")
 
 try:
-    data = requests.get(f"{API}/readings", timeout=5).json()
-    df = pd.DataFrame(data)
+    response = requests.get(f"{api}/readings", params={"limit": 1000}, timeout=5)
+    response.raise_for_status()
+    records = response.json()
+except (requests.RequestException, ValueError) as exc:
+    st.error(f"Cannot reach the API at {api}. Start the backend, then refresh. Details: {exc}")
+    st.stop()
 
-    if df.empty:
-        st.info("No readings yet. Run the simulator or connect the Android app.")
+df = pd.DataFrame(records)
+if df.empty:
+    st.info("No readings recorded yet. Start the simulator or connect a supported device.")
+    st.stop()
+
+df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", utc=True)
+df = df.dropna(subset=["timestamp"]).sort_values("timestamp")
+latest = df.iloc[-1]
+a, b, c, d = st.columns(4)
+def metric(col, title, field, suffix=""):
+    value = latest.get(field)
+    col.metric(title, "—" if pd.isna(value) else f"{value:g}{suffix}")
+metric(a, "Heart rate", "heart_rate", " bpm")
+metric(b, "SpO₂", "spo2", "%")
+metric(c, "HRV", "hrv", " ms")
+metric(d, "Steps", "steps")
+
+st.subheader("Measurement trends")
+for field, label in [("heart_rate", "Heart rate (bpm)"), ("spo2", "SpO₂ (%)"), ("hrv", "HRV (ms)")]:
+    if field in df and df[field].notna().any():
+        st.markdown(f"**{label}**")
+        st.line_chart(df.set_index("timestamp")[field])
+
+st.subheader("Exploratory AI pattern status")
+try:
+    result = requests.get(f"{api}/anomaly", timeout=15)
+    result.raise_for_status()
+    result = result.json()
+    status = result.get("status", "UNKNOWN")
+    if status == "UNUSUAL_PATTERN":
+        st.warning("The model marked the latest sample as unusual relative to this dataset. This is not a diagnosis.")
+    elif status == "NO_UNUSUAL_PATTERN":
+        st.success("The model did not mark the latest sample as unusual relative to this dataset.")
     else:
-        latest = df.iloc[0]
+        st.info(result.get("message", "More valid observations are needed."))
+    st.json(result)
+except (requests.RequestException, ValueError) as exc:
+    st.warning(f"AI endpoint unavailable: {exc}")
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Heart Rate", f"{latest.get('heart_rate', '—')} BPM")
-        c2.metric("SpO₂", f"{latest.get('spo2', '—')}%")
-        c3.metric("HRV", f"{latest.get('hrv', '—')} ms")
-        c4.metric("Steps", f"{latest.get('steps', '—')}")
-
-        if "timestamp" in df and "heart_rate" in df:
-            chart = df.copy()
-            chart["timestamp"] = pd.to_datetime(
-    chart["timestamp"],
-    format="mixed",
-    errors="coerce"
-)
-            chart = chart.sort_values("timestamp")
-            st.subheader("Heart-rate trend")
-            st.line_chart(chart.set_index("timestamp")["heart_rate"])
-
-        try:
-            result = requests.get(f"{API}/anomaly", timeout=5).json()
-            st.subheader("AI status")
-            st.write(result)
-        except Exception as e:
-            st.warning(f"AI endpoint unavailable: {e}")
-
-        st.subheader("Recent readings")
-        st.dataframe(df, use_container_width=True)
-
-except Exception as e:
-    st.error(f"Cannot connect to backend: {e}")
+st.subheader("Recent readings")
+display = df.sort_values("timestamp", ascending=False).copy()
+display["timestamp"] = display["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+st.dataframe(display, use_container_width=True, hide_index=True)
+st.caption("Data source is shown in the device column. Simulator values are artificial test data, not real wearable measurements.")
